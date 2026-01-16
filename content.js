@@ -212,13 +212,22 @@ async function extractFromDOM() {
     const codeElements = document.querySelectorAll('code[class*="language-"]');
     console.log(`Found ${codeElements.length} code elements with language class`);
     
+    // First pass: collect all valid candidates
+    const candidates = [];
+    
     for (const codeElement of codeElements) {
       // Extract language from class name (e.g., "language-cpp" -> "cpp")
       const classList = codeElement.className;
       const langMatch = classList.match(/language-(\w+)/);
-      if (langMatch && langMatch[1]) {
-        language = mapLanguageCode(langMatch[1]);
-        console.log('Found language from code element:', language);
+      const detectedLang = langMatch && langMatch[1] ? langMatch[1].toLowerCase() : '';
+      
+      console.log(`Code element ${Array.from(codeElements).indexOf(codeElement) + 1}, detected language:`, detectedLang);
+      
+      // Check if this code element contains <p> tags (wrong code)
+      const hasPTags = codeElement.querySelector('p') !== null;
+      if (hasPTags) {
+        console.warn('Contains <p> tags, skipping (wrong code)');
+        continue;
       }
       
       // Get text content directly from code element (this includes all nested spans)
@@ -226,14 +235,10 @@ async function extractFromDOM() {
       
       if (rawCode && rawCode.trim().length > 0) {
         const trimmedCode = rawCode.trim();
-        console.log(`Checking code element ${Array.from(codeElements).indexOf(codeElement) + 1}, length:`, trimmedCode.length);
-        console.log('Code preview:', trimmedCode.substring(0, 100));
         
         // Check if this looks like ASCII art (lots of pipes and slashes, few alphanumeric)
         const alphanumericCount = (trimmedCode.match(/[a-zA-Z0-9]/g) || []).length;
         const alphanumericRatio = alphanumericCount / trimmedCode.length;
-        
-        console.log('Alphanumeric ratio:', alphanumericRatio);
         
         // Skip if less than 30% alphanumeric (likely ASCII art)
         if (alphanumericRatio < 0.3) {
@@ -241,14 +246,48 @@ async function extractFromDOM() {
           continue;
         }
         
-        // This looks like real code
-        code = trimmedCode;
-        console.log('Found valid code!');
-        break;
+        // Add to candidates
+        candidates.push({
+          code: trimmedCode,
+          language: detectedLang,
+          element: codeElement
+        });
       }
     }
     
-    // If code element approach didn't work, try other selectors
+    console.log(`Found ${candidates.length} valid candidate(s)`);
+    
+    // Second pass: select the best candidate
+    if (candidates.length > 0) {
+      let selectedCandidate = null;
+      
+      // If there are multiple candidates, prefer non-Go languages
+      if (candidates.length > 1) {
+        // Try to find a non-Go language
+        selectedCandidate = candidates.find(c => c.language !== 'go');
+        
+        if (selectedCandidate) {
+          console.log('Multiple languages found, selecting non-Go language:', selectedCandidate.language);
+        } else {
+          // All are Go, just pick the first one
+          selectedCandidate = candidates[0];
+          console.log('All candidates are Go language, selecting first one');
+        }
+      } else {
+        // Only one candidate, use it (even if it's Go)
+        selectedCandidate = candidates[0];
+        console.log('Only one candidate found, language:', selectedCandidate.language);
+      }
+      
+      // Set the code and language
+      code = selectedCandidate.code;
+      language = mapLanguageCode(selectedCandidate.language);
+      console.log('Selected language:', language);
+      console.log('Code length:', code.length);
+      console.log('Code preview:', code.substring(0, 100));
+    }
+    
+    // If we still don't have code after checking language-* elements, try other selectors
     if (!code) {
       const codeSelectors = [
         '.view-lines',  // Monaco editor
