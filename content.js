@@ -61,6 +61,13 @@ function removeLineNumbers(code) {
       continue;
     }
     
+    // Check if line contains only a number (with optional spaces) - if so, skip it entirely
+    const onlyNumberPattern = /^\s*\d+\s*$/;
+    if (onlyNumberPattern.test(line)) {
+      console.log(`Skipping line with only number: "${line}"`);
+      continue; // Skip this line entirely
+    }
+    
     // Try to match and remove line numbers at the start of the line
     // The key insight: we need to preserve the ORIGINAL indentation that was in the code,
     // not the spaces before the line number
@@ -75,6 +82,12 @@ function removeLineNumbers(code) {
       const leadingSpaces = spaceMatch[1] || '';  // Spaces before line number
       const spacesAfterNumber = spaceMatch[2] || '';  // Spaces after line number
       const codePart = spaceMatch[3] || '';  // The actual code
+      
+      // If code part is empty or only whitespace, skip this line
+      if (!codePart.trim()) {
+        console.log(`Skipping line with number but no code: "${line}"`);
+        continue;
+      }
       
       // The original indentation is likely the spaces after the number minus one space
       // (since there's usually at least one space separating the number from code)
@@ -98,6 +111,12 @@ function removeLineNumbers(code) {
         const leadingSpaces = dotMatch[1] || '';
         const spacesAfterDot = dotMatch[2] || '';
         const codePart = dotMatch[3] || '';
+        
+        // If code part is empty or only whitespace, skip this line
+        if (!codePart.trim()) {
+          console.log(`Skipping line with number and dot but no code: "${line}"`);
+          continue;
+        }
         
         // For dot pattern, preserve any spaces after the dot as indentation
         const reconstructed = leadingSpaces + spacesAfterDot + codePart;
@@ -134,6 +153,12 @@ function removeLineNumbers(code) {
           const leadingSpaces = match[1] || '';
           const spacesAfterSeparator = match[2] || '';
           const codePart = match[3] || match[2] || ''; // Handle tab case
+          
+          // If code part is empty or only whitespace, skip this line
+          if (!codePart.trim()) {
+            console.log(`Skipping line with number and separator but no code: "${line}"`);
+            continue;
+          }
           
           const reconstructed = leadingSpaces + spacesAfterSeparator + codePart;
           cleanedLines.push(reconstructed);
@@ -356,8 +381,35 @@ async function extractFromDOM() {
         continue;
       }
       
-      // Get text content directly from code element (this includes all nested spans)
-      const rawCode = codeElement.textContent || codeElement.innerText;
+      // Remove line number elements before extracting text
+      const cleanedElement = codeElement.cloneNode(true);
+      const lineNumberElements = cleanedElement.querySelectorAll('.linenumber, .react-syntax-highlighter-line-number, [class*="line-number"]');
+      console.log(`Found ${lineNumberElements.length} line number elements to remove`);
+      
+      // Remove all line number elements
+      lineNumberElements.forEach(element => {
+        console.log(`Removing line number element: "${element.textContent.trim()}"`);
+        element.remove();
+      });
+      
+      // Also remove any span elements that only contain numbers (additional safety)
+      const spanElements = cleanedElement.querySelectorAll('span');
+      spanElements.forEach(span => {
+        const text = span.textContent.trim();
+        // If span contains only a number and has styling that suggests it's a line number
+        if (/^\d+$/.test(text) && (
+          span.style.color === 'slategray' ||
+          span.style.userSelect === 'none' ||
+          span.className.includes('line') ||
+          span.className.includes('number')
+        )) {
+          console.log(`Removing number-only span: "${text}"`);
+          span.remove();
+        }
+      });
+      
+      // Get text content from cleaned element
+      const rawCode = cleanedElement.textContent || cleanedElement.innerText;
       
       if (rawCode && rawCode.trim().length > 0) {
         const trimmedCode = rawCode.trim();
@@ -428,7 +480,12 @@ async function extractFromDOM() {
       for (const selector of codeSelectors) {
         const element = document.querySelector(selector);
         if (element && element.textContent.trim()) {
-          const rawCode = element.textContent.trim();
+          // Clone and clean line numbers from this element too
+          const cleanedElement = element.cloneNode(true);
+          const lineNumberElements = cleanedElement.querySelectorAll('.linenumber, .react-syntax-highlighter-line-number, [class*="line-number"]');
+          lineNumberElements.forEach(el => el.remove());
+          
+          const rawCode = cleanedElement.textContent.trim();
           code = removeLineNumbers(rawCode);
           console.log(`Found code with selector "${selector}", length after cleaning:`, code.length);
           
