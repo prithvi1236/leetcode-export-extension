@@ -188,6 +188,7 @@ function createProblemSection(problem) {
       children: [
         new TextRun({
           text: 'Code-',
+          bold: true,
           size: 24, // 12pt
           font: 'Arial'
         })

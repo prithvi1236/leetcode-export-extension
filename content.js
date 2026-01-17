@@ -31,6 +31,100 @@ function extractSubmissionId() {
 }
 
 /**
+ * Removes line numbers from code text while preserving indentation
+ * Handles various line number formats:
+ * - "1 code here"
+ * - "1. code here" 
+ * - "  1  code here"
+ * - "1|code here"
+ * - "1code here" (no space between number and code)
+ * @param {string} code - The code with potential line numbers
+ * @returns {string} Code with line numbers removed but indentation preserved
+ */
+function removeLineNumbers(code) {
+  if (!code || typeof code !== 'string') return code;
+  
+  console.log('Removing line numbers from code...');
+  console.log('Original code length:', code.length);
+  console.log('First 200 chars:', code.substring(0, 200));
+  
+  // Split into lines
+  const lines = code.split('\n');
+  const cleanedLines = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    
+    // Keep empty lines as-is to preserve spacing
+    if (!line.trim()) {
+      cleanedLines.push(line);
+      continue;
+    }
+    
+    // Try to match and remove line numbers at the start of the line
+    // Patterns to match (in order of specificity):
+    // - "1code" (number directly attached to code - no space)
+    // - "1 code" or "1  code" (number followed by spaces)
+    // - "1. code" or "1.  code" (number with dot followed by spaces)  
+    // - "  1  code" (leading spaces, number, spaces)
+    // - "1|code" or "1| code" (number with pipe separator)
+    // - "1:code" or "1: code" (number with colon separator)
+    // - "1\tcode" (number with tab separator)
+    
+    const lineNumberPatterns = [
+      // Pattern for "1code" - number directly attached to code (no space)
+      /^(\s*)\d+([a-zA-Z_${}().[\]].*)$/,    // "  1code" or "1}" - preserve leading spaces, extract code part
+      
+      // Pattern for "1.code" - number with dot directly attached to code
+      /^(\s*)\d+\.([a-zA-Z_${}().[\]].*)$/,  // "  1.code" or "1.function" - preserve leading spaces
+      
+      // Pattern for "1 code" - number followed by space(s)
+      /^(\s*)\d+\s+(.*)$/,                  // "  1  code" or "1 code" - preserve leading spaces
+      
+      // Pattern for "1. code" - number with dot and space
+      /^(\s*)\d+\.\s+(.*)$/,                // "  1. code" - preserve leading spaces
+      
+      // Pattern for "1|code" - number with pipe
+      /^(\s*)\d+\|\s*(.*)$/,                // "  1| code" or "1|code" - preserve leading spaces
+      
+      // Pattern for "1:code" - number with colon
+      /^(\s*)\d+:\s*(.*)$/,                 // "  1: code" or "1:code" - preserve leading spaces
+      
+      // Pattern for "1\tcode" - number with tab
+      /^(\s*)\d+\t+(.*)$/,                  // "1\tcode" - preserve leading spaces
+    ];
+    
+    let cleaned = false;
+    for (const pattern of lineNumberPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        // Found a line number pattern
+        // match[1] = leading whitespace (indentation to preserve)
+        // match[2] = code part after line number
+        const leadingSpaces = match[1] || '';
+        const codePart = match[2] || '';
+        
+        // Reconstruct line with preserved indentation
+        cleanedLines.push(leadingSpaces + codePart);
+        cleaned = true;
+        break;
+      }
+    }
+    
+    // If no line number pattern matched, keep the original line
+    if (!cleaned) {
+      cleanedLines.push(line);
+    }
+  }
+  
+  const cleanedCode = cleanedLines.join('\n');
+  console.log('Cleaned code length:', cleanedCode.length);
+  console.log('First 200 chars after cleaning:', cleanedCode.substring(0, 200));
+  
+  return cleanedCode;
+}
+
+/**
  * Validates if the extracted code looks legitimate
  * @param {string} code - The code to validate
  * @returns {boolean} True if code appears valid
@@ -280,11 +374,11 @@ async function extractFromDOM() {
       }
       
       // Set the code and language
-      code = selectedCandidate.code;
+      code = removeLineNumbers(selectedCandidate.code);
       language = mapLanguageCode(selectedCandidate.language);
       console.log('Selected language:', language);
-      console.log('Code length:', code.length);
-      console.log('Code preview:', code.substring(0, 100));
+      console.log('Code length after line number removal:', code.length);
+      console.log('Code preview after cleaning:', code.substring(0, 100));
     }
     
     // If we still don't have code after checking language-* elements, try other selectors
@@ -302,8 +396,9 @@ async function extractFromDOM() {
       for (const selector of codeSelectors) {
         const element = document.querySelector(selector);
         if (element && element.textContent.trim()) {
-          code = element.textContent.trim();
-          console.log(`Found code with selector "${selector}", length:`, code.length);
+          const rawCode = element.textContent.trim();
+          code = removeLineNumbers(rawCode);
+          console.log(`Found code with selector "${selector}", length after cleaning:`, code.length);
           
           // Validate the extracted code
           if (isValidCode(code)) {
@@ -455,7 +550,7 @@ function sendToExtension(data) {
 
 // Always set up message listener, regardless of page type
 // This ensures the popup can always communicate with the content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('Content script received message:', message);
   
   // Handle ping to verify content script is loaded

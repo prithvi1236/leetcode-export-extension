@@ -1,50 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LeetCode Doc Generator</title>
-  <link rel="stylesheet" href="popup.css">
+
+  <!-- Icons -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="popup.css" />
 </head>
+
 <body>
   <div class="container">
-    <h1>LeetCode Doc Generator</h1>
-    
-    <!-- Problem Set Info Section -->
-    <section class="problem-set-info">
-      <h2>Problem Set Information</h2>
-      <input type="text" id="problemSetTitle" placeholder="Problem Set Title (e.g., Problem Set 6)">
-      <input type="text" id="studentName" placeholder="Student Name">
-      <button id="saveProblemSetInfo">Save Info</button>
+
+    <!-- Header -->
+    <header>
+      <h1>
+        <i class="fas fa-file-code"></i>
+        LeetCode Doc Generator
+      </h1>
+    </header>
+
+    <!-- Set Info -->
+    <section class="card">
+      <div class="section-title">
+        <i class="fas fa-info-circle"></i>
+        Set Information
+      </div>
+
+      <div class="input-group">
+        <input type="text" id="problemSetTitle"
+               placeholder="Problem Set Title (e.g., Problem Set 6)">
+        <input type="text" id="studentName"
+               placeholder="Student Name">
+      </div>
+
+      <button id="saveProblemSetInfo" class="ghost-button">
+        <i class="fas fa-save"></i> Save Info
+      </button>
     </section>
 
-    <!-- Capture Section -->
-    <section class="capture-section">
-      <button id="captureButton" class="primary-button">Capture from Current Page</button>
+    <!-- Capture -->
+    <section class="card">
+      <button id="captureButton" class="primary-button full-width">
+        <i class="fas fa-camera"></i> Capture from Current Page
+      </button>
       <div id="statusMessage" class="status-message"></div>
     </section>
 
-    <!-- Problems List Section -->
-    <section class="problems-list">
-      <div class="problems-header">
-        <h2>Captured Problems</h2>
-        <span id="problemCount" class="problem-count">0 problems</span>
+    <!-- Problems -->
+    <section class="card">
+      <div class="section-title">
+        <i class="fas fa-list"></i>
+        Problems (<span id="problemCount">0 problems</span>)
       </div>
-      <div id="problemsList" class="problems-container"></div>
-      <button id="clearAllButton" class="danger-button" style="display: none;">Clear All</button>
+      
+      <div id="problemsList" class="problems-list">
+        <div class="empty-state">No problems captured yet.<br>Click "Capture from Current Page" on a LeetCode submission page.</div>
+      </div>
+      
+      <button id="clearAllButton" class="secondary-button" style="display: none;">
+        <i class="fas fa-trash"></i> Clear All
+      </button>
     </section>
 
-    <!-- Actions Section -->
+    <!-- Actions -->
     <section class="actions">
-      <button id="generateDocButton" class="primary-button">Generate Document</button>
-      <button id="startNewButton" class="secondary-button">Start New Problem Set</button>
+      <button id="generateDocButton" class="primary-button">
+        <i class="fas fa-file-word"></i> Generate Document
+      </button>
+      <button id="startNewButton" class="secondary-button">
+        <i class="fas fa-plus"></i> New Set
+      </button>
     </section>
+
   </div>
 
-  <!-- Load docx library locally -->
+  <!-- Scripts -->
   <script src="docx.min.js"></script>
-  
-  <!-- Load our scripts -->
   <script src="storage.js"></script>
   <script src="docxGenerator.js"></script>
   <script src="popup.js"></script>

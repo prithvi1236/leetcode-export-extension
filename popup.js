@@ -162,51 +162,41 @@ function displayProblems() {
  */
 function createProblemItem(problem, index) {
   const item = document.createElement('div');
-  item.className = 'problem-item';
+  item.className = 'problem-card';
   item.draggable = true;
   item.dataset.problemId = problem.id;
-  
-  // Position number (1-indexed)
-  const positionNumber = index + 1;
-  
+
   item.innerHTML = `
-    <div class="problem-item-header">
-      <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
-      <div class="problem-item-content">
-        <div class="problem-title">
-          <span class="position-number">${positionNumber}.</span>
-          <h3>${escapeHtml(problem.name)}</h3>
-        </div>
-        <span class="language-badge">${escapeHtml(problem.language)}</span>
-        <div class="problem-item-actions">
-          <div class="reorder-controls">
-            <button class="move-up" ${index === 0 ? 'disabled' : ''} title="Move up">↑</button>
-            <button class="move-down" ${index === currentProblems.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
-          </div>
-          <button class="edit-button">Edit</button>
-          <button class="delete-button">Delete</button>
-        </div>
+    <div class="problem-header">
+      <div class="problem-title">
+        <span class="problem-index">${index + 1}.</span>
+        <span class="problem-name">${escapeHtml(problem.name)}</span>
+      </div>
+
+      <div class="problem-actions">
+        <i class="fas fa-pen edit-icon" title="Edit"></i>
+        <i class="fas fa-trash delete-icon" title="Delete"></i>
       </div>
     </div>
+
+    <div class="problem-meta">
+      <span class="language-badge">${escapeHtml(problem.language)}</span>
+    </div>
   `;
-  
-  // Add event listeners
-  const moveUpBtn = item.querySelector('.move-up');
-  const moveDownBtn = item.querySelector('.move-down');
-  const editBtn = item.querySelector('.edit-button');
-  const deleteBtn = item.querySelector('.delete-button');
-  
-  moveUpBtn.addEventListener('click', () => handleMoveProblem(problem.id, 'up'));
-  moveDownBtn.addEventListener('click', () => handleMoveProblem(problem.id, 'down'));
-  editBtn.addEventListener('click', () => handleEditProblem(problem.id));
-  deleteBtn.addEventListener('click', () => handleDeleteProblem(problem.id));
-  
-  // Drag and drop event listeners
+
+  // Icon listeners
+  item.querySelector('.edit-icon')
+      .addEventListener('click', () => handleEditProblem(problem.id));
+
+  item.querySelector('.delete-icon')
+      .addEventListener('click', () => handleDeleteProblem(problem.id));
+
+  // Drag & drop (keep existing logic)
   item.addEventListener('dragstart', handleDragStart);
   item.addEventListener('dragover', handleDragOver);
   item.addEventListener('drop', handleDrop);
   item.addEventListener('dragend', handleDragEnd);
-  
+
   return item;
 }
 
@@ -809,7 +799,7 @@ async function handleGenerateDocument() {
     };
     
     // Validate that docx library is loaded
-    if (typeof docx === 'undefined') {
+    if (typeof window.docx === 'undefined') {
       throw new Error('Document generation library not loaded. Please refresh the extension.');
     }
     
@@ -822,7 +812,7 @@ async function handleGenerateDocument() {
     const doc = generateDocxDocument(documentData);
     
     // Convert to blob using Packer from docx library
-    const blob = await docx.Packer.toBlob(doc);
+    const blob = await window.docx.Packer.toBlob(doc);
     
     // Validate blob was created
     if (!blob || blob.size === 0) {
