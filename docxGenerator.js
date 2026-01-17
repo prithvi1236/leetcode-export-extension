@@ -167,7 +167,8 @@ function createProblemSection(problem) {
               text: problem.submissionLink,
               size: 24, // 12pt
               font: 'Arial',
-              style: 'Hyperlink'
+              style: 'Hyperlink',
+              color: '000000' 
             })
           ],
           link: problem.submissionLink
