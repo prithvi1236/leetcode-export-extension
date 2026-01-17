@@ -189,6 +189,29 @@ button {
   border: 1px solid #f5c6cb;
 }
 
+.status-message.refreshing {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-message .spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #bee5eb;
+  border-top: 2px solid #0c5460;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* ===== Problems List ===== */
 .problems-list {
   min-height: 40px;

@@ -326,7 +326,7 @@ async function handleSaveProblemSetInfo() {
 async function checkContentScriptReady(tabId, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Ping attempt ${attempt}`);
+      console.log(`Ping attempt ${attempt}/${maxRetries}`);
       const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
       if (response && response.success) {
         console.log('Content script is ready');
@@ -335,12 +335,25 @@ async function checkContentScriptReady(tabId, maxRetries = 3) {
     } catch (error) {
       console.error(`Ping attempt ${attempt} failed:`, error);
       if (attempt < maxRetries) {
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait before retrying (longer wait for post-refresh checks)
+        const waitTime = maxRetries > 3 ? 1000 : 300; // 1s for post-refresh, 300ms for initial
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
   }
   return false;
+}
+
+/**
+ * Show a countdown while the page is refreshing
+ */
+async function showRefreshCountdown() {
+  const countdownDuration = 3; // 3 seconds
+  
+  for (let i = countdownDuration; i > 0; i--) {
+    showStatus(`Page refreshing... ${i}`, 'refreshing');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 }
 
 /**
@@ -381,10 +394,47 @@ async function handleCaptureFromCurrentPage() {
       return;
     }
     
-    showStatus('Waiting for page to load...', 'success');
+    showStatus('Checking page status...', 'success');
     captureButton.disabled = true;
+    captureButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
     
-    // Send message to content script to extract data
+    // First, check if content script is ready
+    const isContentScriptReady = await checkContentScriptReady(tab.id, 1); // Only 1 attempt initially
+    
+    if (!isContentScriptReady) {
+      console.log('Content script not ready, refreshing page...');
+      showStatus('Content script not loaded. Refreshing page...', 'refreshing');
+      captureButton.innerHTML = '<i class="fas fa-refresh fa-spin"></i> Refreshing...';
+      
+      // Refresh the page
+      await chrome.tabs.reload(tab.id);
+      
+      // Show refreshing status with countdown
+      await showRefreshCountdown();
+      
+      // Wait for page to reload and content script to load
+      console.log('Waiting for page to reload...');
+      showStatus('Page refreshed. Waiting for content script...', 'refreshing');
+      captureButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+      
+      // Check again with more attempts after refresh
+      const isReadyAfterRefresh = await checkContentScriptReady(tab.id, 5);
+      
+      if (!isReadyAfterRefresh) {
+        showStatus('Content script still not ready after refresh. Please try again.', 'error');
+        return;
+      }
+      
+      console.log('✓ Content script ready after refresh');
+      showStatus('Content script loaded. Capturing data...', 'success');
+      captureButton.innerHTML = '<i class="fas fa-download fa-spin"></i> Capturing...';
+    } else {
+      console.log('✓ Content script already ready');
+      showStatus('Capturing data...', 'success');
+      captureButton.innerHTML = '<i class="fas fa-download fa-spin"></i> Capturing...';
+    }
+    
+    // Now attempt to extract data
     try {
       const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_PROBLEM_DATA' });
       
@@ -419,14 +469,15 @@ async function handleCaptureFromCurrentPage() {
         showStatus(errorMsg, 'error');
       }
     } catch (messageError) {
-      console.error('✗ Message error:', messageError);
-      showStatus('Error: Content script not loaded. Please refresh the page and try again.', 'error');
+      console.error('✗ Message error after refresh:', messageError);
+      showStatus('Error: Content script still not responding. Please try refreshing manually.', 'error');
     }
   } catch (error) {
     console.error('✗ Error capturing problem:', error);
     showStatus('Error capturing problem.', 'error');
   } finally {
     captureButton.disabled = false;
+    captureButton.innerHTML = '<i class="fas fa-camera"></i> Capture from Current Page';
   }
 }
 
@@ -434,14 +485,23 @@ async function handleCaptureFromCurrentPage() {
  * Show status message
  */
 function showStatus(message, type) {
-  statusMessage.textContent = message;
   statusMessage.className = `status-message ${type}`;
-  statusMessage.style.display = 'block';
   
-  // Auto-hide after 3 seconds
-  setTimeout(() => {
-    statusMessage.style.display = 'none';
-  }, 3000);
+  if (type === 'refreshing') {
+    // Add spinner for refreshing status
+    statusMessage.innerHTML = `<div class="spinner"></div>${message}`;
+  } else {
+    statusMessage.textContent = message;
+  }
+  
+  statusMessage.style.display = type === 'refreshing' ? 'flex' : 'block';
+  
+  // Auto-hide after 3 seconds (except for refreshing status)
+  if (type !== 'refreshing') {
+    setTimeout(() => {
+      statusMessage.style.display = 'none';
+    }, 3000);
+  }
 }
 
 /**
