@@ -7,6 +7,14 @@
 console.log('LeetCode Doc Generator background service worker loaded');
 
 /**
+ * Handle keyboard shortcut commands and action clicks
+ */
+chrome.action.onClicked.addListener(async (tab) => {
+  // This won't fire when there's a popup, but we can detect shortcut usage
+  console.log('Action clicked (likely via shortcut)');
+});
+
+/**
  * Message router between content script and popup
  * Routes messages based on sender and message type
  */
@@ -31,6 +39,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     
     return true; // Keep message channel open for async response
+  }
+  
+  // Handle AUTO_EXTRACTED_DATA from keyboard shortcut or redirect
+  if (message.type === 'AUTO_EXTRACTED_DATA' && isFromContentScript) {
+    console.log('Auto-extracted data from content script:', message.data);
+    
+    // Import storage helper functions and save the problem
+    // We'll notify the user via a simple notification
+    chrome.storage.local.get(['problems'], (result) => {
+      const problems = result.problems || [];
+      
+      // Add the new problem
+      const newProblem = {
+        id: Date.now().toString(),
+        ...message.data,
+        timestamp: Date.now()
+      };
+      
+      problems.push(newProblem);
+      
+      chrome.storage.local.set({ problems }, () => {
+        console.log('Problem saved via keyboard shortcut');
+        sendResponse({ success: true, message: 'Problem saved' });
+      });
+    });
+    
+    return true;
   }
   
   // For other message types, allow direct communication

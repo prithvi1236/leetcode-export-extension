@@ -118,6 +118,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadProblemSetInfo();
   await loadProblems();
   
+  // Auto-trigger capture when popup opens (for keyboard shortcut)
+  // Small delay to ensure popup is fully loaded
+  setTimeout(() => {
+    if (captureButton && !captureButton.disabled) {
+      console.log('Auto-triggering capture after popup load');
+      captureButton.click();
+    }
+  }, 200);
+  
   console.log('Popup initialization complete');
 });
 
