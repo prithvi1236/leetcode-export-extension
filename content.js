@@ -192,6 +192,14 @@ function isValidCode(code) {
   // Check if code is too short (likely corrupted)
   if (code.trim().length < 10) return false;
   
+  // Check if this looks like test case data (arrays of numbers/data without code keywords)
+  // Test case data pattern: mostly just arrays, numbers, commas, brackets
+  const looksLikeTestData = /^[\[\]\d,\s\n]+$/.test(code.trim());
+  if (looksLikeTestData) {
+    console.warn('Content appears to be test case data (only arrays and numbers)');
+    return false;
+  }
+  
   // Check for common code patterns (at least one of these should be present in real code)
   const codePatterns = [
     /function/i,
@@ -204,7 +212,6 @@ function isValidCode(code) {
     /for\s*\(/,
     /while\s*\(/,
     /\{[\s\S]*\}/,  // curly braces with content
-    /\[[\s\S]*\]/,  // square brackets
     /import/i,
     /include/i,
     /#include/,
@@ -223,6 +230,8 @@ function isValidCode(code) {
     /list/i,
     /map/i,
     /set/i,
+    /struct/i,
+    /enum/i,
   ];
   
   // If code contains at least one code pattern, it's likely valid
@@ -230,8 +239,7 @@ function isValidCode(code) {
   
   if (!hasCodePattern) {
     console.warn('No code patterns found in extracted text');
-    // Don't fail validation - just warn
-    // Some valid code might not match our patterns
+    return false;  // Changed to fail validation if no code patterns found
   }
   
   // Check if it looks like ASCII art or garbage (lots of special characters, no letters)
@@ -414,6 +422,13 @@ async function extractFromDOM() {
       if (rawCode && rawCode.trim().length > 0) {
         const trimmedCode = rawCode.trim();
         
+        // Check if this looks like test case data (only arrays, numbers, brackets, commas)
+        const looksLikeTestData = /^[\[\]\d,\s\n]+$/.test(trimmedCode);
+        if (looksLikeTestData) {
+          console.warn('Skipping test case data (only arrays and numbers)');
+          continue;
+        }
+        
         // Check if this looks like ASCII art (lots of pipes and slashes, few alphanumeric)
         const alphanumericCount = (trimmedCode.match(/[a-zA-Z0-9]/g) || []).length;
         const alphanumericRatio = alphanumericCount / trimmedCode.length;
@@ -421,6 +436,13 @@ async function extractFromDOM() {
         // Skip if less than 30% alphanumeric (likely ASCII art)
         if (alphanumericRatio < 0.3) {
           console.warn('Low alphanumeric ratio, skipping this element (likely ASCII art)');
+          continue;
+        }
+        
+        // Skip if no code-like keywords found
+        const hasCodeKeywords = /\b(function|class|def|return|if|for|while|public|private|const|let|var|import|include)\b/i.test(trimmedCode);
+        if (!hasCodeKeywords) {
+          console.warn('No code keywords found, skipping this element');
           continue;
         }
         
