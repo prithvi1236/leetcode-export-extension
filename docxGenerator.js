@@ -4,7 +4,7 @@
  */
 
 // Make docx available globally (loaded via CDN in popup.html)
-const { Document, Paragraph, TextRun, Packer } = window.docx;
+const { Document, Paragraph, TextRun, Packer, ExternalHyperlink } = window.docx;
 
 /**
  * Generates a .docx document from problem set data
@@ -161,11 +161,17 @@ function createProblemSection(problem) {
   paragraphs.push(
     new Paragraph({
       children: [
-        new TextRun({
-          text: problem.submissionLink,
-          size: 24, // 12pt
-          font: 'Arial',
-          color: '000000' // Black color
+        new ExternalHyperlink({
+          children: [
+            new TextRun({
+              text: problem.submissionLink,
+              size: 24, // 12pt
+              font: 'Arial',
+              style: 'Hyperlink',
+              color: '000000' 
+            })
+          ],
+          link: problem.submissionLink
         })
       ],
       spacing: {
