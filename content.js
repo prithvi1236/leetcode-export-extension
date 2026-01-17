@@ -19,6 +19,14 @@ function detectLeetCodeSubmissionPage() {
 }
 
 /**
+ * Checks if current URL is the detail-only format (needs conversion)
+ * @returns {boolean} True if on /submissions/detail/{id}/ format
+ */
+function isDetailOnlyUrl() {
+  return /\/submissions\/detail\/\d+/.test(window.location.pathname);
+}
+
+/**
  * Extracts the submission ID from the current URL
  * Examples: 
  * - /problems/minimum-bit-flips/submissions/1886581454/ -> "1886581454"
@@ -26,8 +34,54 @@ function detectLeetCodeSubmissionPage() {
  * @returns {string|null} Submission ID or null if not found
  */
 function extractSubmissionId() {
-  const match = window.location.pathname.match(/\/submissions\/(\d+)/);
+  // Match both formats: /submissions/{id}/ and /submissions/detail/{id}/
+  const match = window.location.pathname.match(/\/submissions\/(?:detail\/)?(\d+)/);
   return match ? match[1] : null;
+}
+
+/**
+ * Extracts problem slug from the page and redirects to proper URL format
+ * Converts /submissions/detail/{id}/ to /problems/{slug}/submissions/{id}/
+ * Looks for: <a class="ml-1 hover:underline" href="/problems/{slug}/">
+ * @returns {Promise<void>}
+ */
+async function redirectToProperSubmissionUrl() {
+  const submissionId = extractSubmissionId();
+  if (!submissionId) {
+    console.error('Could not extract submission ID');
+    return;
+  }
+
+  try {
+    // Wait for page to load and find the problem link
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Look for the specific problem link with class "ml-1 hover:underline"
+    const problemLink = document.querySelector('a.ml-1.hover\\:underline[href*="/problems/"]');
+    
+    if (problemLink) {
+      const href = problemLink.getAttribute('href');
+      console.log('Found problem link:', href);
+      
+      // Extract problem slug from href (e.g., "/problems/max-consecutive-ones-iii/" -> "max-consecutive-ones-iii")
+      const slugMatch = href.match(/\/problems\/([^\/]+)/);
+      
+      if (slugMatch) {
+        const problemSlug = slugMatch[1];
+        const properUrl = `https://leetcode.com/problems/${problemSlug}/submissions/${submissionId}/`;
+        
+        console.log('Redirecting to proper submission URL:', properUrl);
+        // Set flag to auto-extract after redirect
+        sessionStorage.setItem('leetcode_auto_extract', 'true');
+        window.location.href = properUrl;
+        return;
+      }
+    }
+    
+    console.warn('Could not find problem link with class "ml-1 hover:underline"');
+  } catch (error) {
+    console.error('Error redirecting to proper URL:', error);
+  }
 }
 
 /**
@@ -192,6 +246,14 @@ function isValidCode(code) {
   // Check if code is too short (likely corrupted)
   if (code.trim().length < 10) return false;
   
+  // Check if this looks like test case data (arrays of numbers/data without code keywords)
+  // Test case data pattern: mostly just arrays, numbers, commas, brackets
+  const looksLikeTestData = /^[\[\]\d,\s\n]+$/.test(code.trim());
+  if (looksLikeTestData) {
+    console.warn('Content appears to be test case data (only arrays and numbers)');
+    return false;
+  }
+  
   // Check for common code patterns (at least one of these should be present in real code)
   const codePatterns = [
     /function/i,
@@ -204,7 +266,6 @@ function isValidCode(code) {
     /for\s*\(/,
     /while\s*\(/,
     /\{[\s\S]*\}/,  // curly braces with content
-    /\[[\s\S]*\]/,  // square brackets
     /import/i,
     /include/i,
     /#include/,
@@ -223,6 +284,8 @@ function isValidCode(code) {
     /list/i,
     /map/i,
     /set/i,
+    /struct/i,
+    /enum/i,
   ];
   
   // If code contains at least one code pattern, it's likely valid
@@ -230,8 +293,7 @@ function isValidCode(code) {
   
   if (!hasCodePattern) {
     console.warn('No code patterns found in extracted text');
-    // Don't fail validation - just warn
-    // Some valid code might not match our patterns
+    return false;  // Changed to fail validation if no code patterns found
   }
   
   // Check if it looks like ASCII art or garbage (lots of special characters, no letters)
@@ -414,6 +476,13 @@ async function extractFromDOM() {
       if (rawCode && rawCode.trim().length > 0) {
         const trimmedCode = rawCode.trim();
         
+        // Check if this looks like test case data (only arrays, numbers, brackets, commas)
+        const looksLikeTestData = /^[\[\]\d,\s\n]+$/.test(trimmedCode);
+        if (looksLikeTestData) {
+          console.warn('Skipping test case data (only arrays and numbers)');
+          continue;
+        }
+        
         // Check if this looks like ASCII art (lots of pipes and slashes, few alphanumeric)
         const alphanumericCount = (trimmedCode.match(/[a-zA-Z0-9]/g) || []).length;
         const alphanumericRatio = alphanumericCount / trimmedCode.length;
@@ -421,6 +490,13 @@ async function extractFromDOM() {
         // Skip if less than 30% alphanumeric (likely ASCII art)
         if (alphanumericRatio < 0.3) {
           console.warn('Low alphanumeric ratio, skipping this element (likely ASCII art)');
+          continue;
+        }
+        
+        // Skip if no code-like keywords found
+        const hasCodeKeywords = /\b(function|class|def|return|if|for|while|public|private|const|let|var|import|include)\b/i.test(trimmedCode);
+        if (!hasCodeKeywords) {
+          console.warn('No code keywords found, skipping this element');
           continue;
         }
         
@@ -621,6 +697,22 @@ async function extractProblemData() {
 }
 
 /**
+ * Checks if the submission page is fully loaded and ready for extraction
+ * @returns {boolean} True if page is ready
+ */
+function isPageReadyForExtraction() {
+  // Check if code elements are present
+  const codeElements = document.querySelectorAll('code[class*="language-"]');
+  if (codeElements.length === 0) return false;
+  
+  // Check if problem name is present
+  const problemLink = document.querySelector('a[href*="/problems/"]');
+  if (!problemLink) return false;
+  
+  return true;
+}
+
+/**
  * Sends extracted problem data to the extension
  * @param {Object} data - Problem data to send
  */
@@ -673,6 +765,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
     }
     
+    // If on detail-only URL, redirect to proper format first
+    if (isDetailOnlyUrl()) {
+      console.log('On detail-only URL, redirecting to proper format...');
+      redirectToProperSubmissionUrl();
+      sendResponse({ success: true, message: 'Redirecting to proper URL format...' });
+      return true;
+    }
+    
     console.log('Extracting problem data for submission ID:', submissionId);
     
     // Wait a bit for page to fully render, then extract
@@ -703,6 +803,43 @@ if (detectLeetCodeSubmissionPage()) {
   const submissionId = extractSubmissionId();
   if (submissionId) {
     console.log('On LeetCode submission page with ID:', submissionId);
+    
+    // Check if we just redirected from detail-only URL
+    const wasRedirected = sessionStorage.getItem('leetcode_auto_extract') === 'true';
+    if (wasRedirected) {
+      console.log('Page loaded after redirect - waiting for page to be ready...');
+      sessionStorage.removeItem('leetcode_auto_extract'); // Clear flag
+      
+      // Poll until page is ready, then auto-extract
+      let checkCount = 0;
+      const maxChecks = 20; // Maximum 10 seconds (20 * 500ms)
+      
+      const checkAndExtract = setInterval(async () => {
+        checkCount++;
+        
+        if (isPageReadyForExtraction()) {
+          clearInterval(checkAndExtract);
+          console.log('Page is ready! Auto-extracting data...');
+          
+          try {
+            const data = await extractProblemData();
+            console.log('Auto-extracted problem data successfully');
+            // Send directly to background/popup
+            chrome.runtime.sendMessage({
+              type: 'AUTO_EXTRACTED_DATA',
+              data: data
+            });
+          } catch (error) {
+            console.error('Auto-extraction failed:', error);
+          }
+        } else if (checkCount >= maxChecks) {
+          clearInterval(checkAndExtract);
+          console.warn('Page did not load in time, auto-extraction cancelled');
+        } else {
+          console.log(`Waiting for page to load... (${checkCount}/${maxChecks})`);
+        }
+      }, 500); // Check every 500ms
+    }
   } else {
     console.log('On LeetCode submission page but could not extract ID');
   }

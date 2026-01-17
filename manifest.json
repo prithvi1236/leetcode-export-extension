@@ -18,6 +18,13 @@
       "128": "icons/icon128.png"
     }
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K"
+      }
+    }
+  },
   "content_scripts": [
     {
       "matches": [

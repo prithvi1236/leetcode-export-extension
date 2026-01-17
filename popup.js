@@ -20,6 +20,47 @@ let currentProblems = [];
 let currentProblemSetInfo = { title: '', submittedBy: '' };
 
 /**
+ * Listen for auto-extracted data from content script
+ */
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'AUTO_EXTRACTED_DATA') {
+    console.log('Received auto-extracted data:', message.data);
+    handleAutoExtractedData(message.data);
+  }
+});
+
+/**
+ * Handle auto-extracted data from content script
+ */
+async function handleAutoExtractedData(data) {
+  try {
+    console.log('Processing auto-extracted data...');
+    showStatus('Auto-extracting data...', 'success');
+    
+    // Validate captured data
+    const validation = validateProblemData(data);
+    if (!validation.valid) {
+      showStatus(`Validation error: ${validation.error}`, 'error');
+      return;
+    }
+    console.log('✓ Data validation passed');
+    
+    // Add problem to storage
+    await addProblem(data);
+    console.log('✓ Problem saved to storage');
+    
+    // Reload problems list
+    await loadProblems();
+    console.log('✓ Problems list reloaded');
+    
+    showStatus(`Auto-captured: ${data.name}`, 'success');
+  } catch (error) {
+    console.error('Error handling auto-extracted data:', error);
+    showStatus('Error processing auto-extracted data', 'error');
+  }
+}
+
+/**
  * Initialize popup when DOM is ready
  */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -76,6 +117,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load data from storage
   await loadProblemSetInfo();
   await loadProblems();
+  
+  // Auto-trigger capture when popup opens (for keyboard shortcut)
+  // Small delay to ensure popup is fully loaded
+  setTimeout(() => {
+    if (captureButton && !captureButton.disabled) {
+      console.log('Auto-triggering capture after popup load');
+      captureButton.click();
+    }
+  }, 200);
   
   console.log('Popup initialization complete');
 });
@@ -439,6 +489,14 @@ async function handleCaptureFromCurrentPage() {
       const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_PROBLEM_DATA' });
       
       if (response && response.success) {
+        // Check if it's a redirect message (for detail-only URLs)
+        if (response.message && response.message.includes('Redirecting')) {
+          console.log('✓ Redirecting to proper URL format...');
+          showStatus('Redirecting to proper URL...', 'success');
+          // Don't process data yet, wait for redirect and auto-extraction
+          return;
+        }
+        
         console.log('✓ Received data from content script');
         console.log('  - Problem name:', response.data.name);
         console.log('  - Language:', response.data.language);
@@ -470,7 +528,12 @@ async function handleCaptureFromCurrentPage() {
       }
     } catch (messageError) {
       console.error('✗ Message error after refresh:', messageError);
-      showStatus('Error: Content script still not responding. Please try refreshing manually.', 'error');
+      // Check if we're on a detail-only URL that might be redirecting
+      if (tab.url && tab.url.includes('leetcode.com/submissions/detail/')) {
+        showStatus('Redirecting to proper URL format...', 'success');
+      } else {
+        showStatus('Error: Content script still not responding. Please try refreshing manually.', 'error');
+      }
     }
   } catch (error) {
     console.error('✗ Error capturing problem:', error);

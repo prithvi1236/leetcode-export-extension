@@ -5,6 +5,8 @@ A Chrome extension that helps students document their LeetCode problem solutions
 ## Features
 
 - ✅ **Smart Code Extraction**: Automatically capture LeetCode submission details from submission pages
+- ✅ **Keyboard Shortcut**: Quick capture with Ctrl+Shift+K - opens popup and auto-captures
+- ✅ **Auto-Redirect & Extract**: Handles `/submissions/detail/{id}/` URLs automatically
 - ✅ **Intelligent Line Number Removal**: Removes line numbers while preserving code indentation
 - ✅ **HTML Element Filtering**: Ignores React syntax highlighter line number elements
 - ✅ **Auto-Refresh**: Automatically refreshes page if content script isn't loaded
@@ -17,6 +19,18 @@ A Chrome extension that helps students document their LeetCode problem solutions
 - ✅ **Clean User Interface**: Simple and intuitive design with responsive feedback
 
 ## Recent Enhancements
+
+### ⌨️ Keyboard Shortcut Capture
+- **Quick Access**: Press Ctrl+Shift+K to open popup and auto-capture
+- **Seamless Workflow**: Instantly capture without clicking buttons
+- **Customizable**: Change shortcut at chrome://extensions/shortcuts
+- **Auto-Redirect Support**: Works on both URL formats
+
+### 🔄 Smart URL Handling
+- **Detail-Only URL Support**: Handles `/submissions/detail/{id}/` URLs
+- **Auto-Redirect**: Automatically redirects to proper format
+- **Auto-Extract**: Extracts data after redirect without manual intervention
+- **Problem Slug Detection**: Finds correct problem from page content
 
 ### 🔄 Auto-Refresh Feature
 - **Smart Detection**: Automatically detects when content script isn't loaded
@@ -72,6 +86,16 @@ leetcode-doc-generator/
 - Click "Save Problem Set Info"
 
 ### 2. Capture submissions:
+
+**Method 1: Using Keyboard Shortcut (Fastest)**
+- Navigate to any LeetCode submission page (standard or detail-only URL)
+- Press **Ctrl+Shift+K** (or customize at chrome://extensions/shortcuts)
+- Popup opens and automatically captures the submission
+- Works on both URL formats:
+  - `/problems/{slug}/submissions/{id}/`
+  - `/submissions/detail/{id}/` (auto-redirects and extracts)
+
+**Method 2: Manual Capture**
 - Navigate to a LeetCode submission page
 - Click the extension icon
 - Click "Capture from Current Page"
